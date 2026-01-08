@@ -1,126 +1,132 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>1 Minute Challenge</title>
+<title>时间裂缝：反应力极限</title>
 <style>
-body {
-  margin:0;
-  background:#0b0b10;
-  color:#fff;
-  font-family:monospace;
-  overflow:hidden;
-}
-#ui {
-  position:fixed;
-  top:10px; left:10px;
-}
-.player {
-  position:absolute;
-  width:12px; height:12px;
-  background:#00ffd5;
-  box-shadow:0 0 12px #00ffd5;
-}
-.enemy {
-  position:absolute;
-  width:10px; height:10px;
-  background:#ff3355;
-}
-#overlay {
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.85);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-}
-button {
-  padding:10px 20px;
-  margin-top:12px;
-  font-family:monospace;
-  cursor:pointer;
-}
+    body {
+        margin: 0;
+        background: #0b0b0f;
+        color: white;
+        font-family: "Segoe UI", sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+    }
+    canvas {
+        background: radial-gradient(circle at center, #111 0%, #000 70%);
+        border-radius: 12px;
+        box-shadow: 0 0 40px rgba(0,255,255,0.2);
+    }
+    #tip {
+        position: absolute;
+        top: 20px;
+        font-size: 16px;
+        opacity: 0.8;
+    }
 </style>
 </head>
 <body>
 
-<div id="ui">
-  <div>⏱ Survive 60 seconds</div>
-  <div id="time">0.0s</div>
-</div>
-
-<div id="overlay">
-  <div id="result"></div>
-  <button onclick="restart()">Retry</button>
-  <button onclick="unlock()">🌍 Unlock Global Ranking (¥9.9)</button>
-</div>
+<div id="tip">在「时间裂缝」中点击 / 空格得分</div>
+<canvas id="game" width="420" height="420"></canvas>
 
 <script>
-const body = document.body;
-let px = innerWidth/2, py = innerHeight/2;
-let player = document.createElement("div");
-player.className="player";
-body.appendChild(player);
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-let enemies=[];
-let start=performance.now();
-let alive=true;
+let ball = { x: 210, y: 210, r: 14, vx: 3, vy: 2 };
+let score = 0;
+let gameOver = false;
 
-function spawn(){
-  let e=document.createElement("div");
-  e.className="enemy";
-  e.x=Math.random()*innerWidth;
-  e.y=Math.random()*innerHeight;
-  body.appendChild(e);
-  enemies.push(e);
+let timeCrack = false;
+let crackTimer = 0;
+let crackDuration = 800;
+
+function drawBall() {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fillStyle = timeCrack ? "#00ffff" : "#ffffff";
+    ctx.shadowBlur = timeCrack ? 25 : 0;
+    ctx.shadowColor = "#00ffff";
+    ctx.fill();
+    ctx.shadowBlur = 0;
 }
-setInterval(spawn,500);
 
-document.addEventListener("mousemove",e=>{
-  px=e.clientX; py=e.clientY;
+function drawUI() {
+    ctx.fillStyle = "#fff";
+    ctx.font = "20px Arial";
+    ctx.fillText("Score: " + score, 20, 30);
+
+    if (gameOver) {
+        ctx.fillStyle = "#ff5555";
+        ctx.font = "28px Arial";
+        ctx.fillText("GAME OVER", 115, 200);
+        ctx.font = "16px Arial";
+        ctx.fillText("刷新页面重新开始", 135, 235);
+    }
+}
+
+function update() {
+    if (gameOver) return;
+
+    let speedFactor = timeCrack ? 0.3 : 1;
+
+    ball.x += ball.vx * speedFactor;
+    ball.y += ball.vy * speedFactor;
+
+    if (ball.x < ball.r || ball.x > 420 - ball.r) ball.vx *= -1;
+    if (ball.y < ball.r || ball.y > 420 - ball.r) ball.vy *= -1;
+
+    // 随机触发时间裂缝
+    if (!timeCrack && Math.random() < 0.005) {
+        timeCrack = true;
+        crackTimer = Date.now();
+    }
+
+    if (timeCrack && Date.now() - crackTimer > crackDuration) {
+        timeCrack = false;
+    }
+}
+
+function render() {
+    ctx.clearRect(0, 0, 420, 420);
+
+    if (timeCrack) {
+        ctx.fillStyle = "rgba(0,255,255,0.05)";
+        ctx.fillRect(0, 0, 420, 420);
+    }
+
+    drawBall();
+    drawUI();
+}
+
+function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+}
+
+function hit() {
+    if (gameOver) return;
+
+    if (timeCrack) {
+        score++;
+        crackDuration = Math.max(250, crackDuration - 30);
+    } else {
+        gameOver = true;
+    }
+}
+
+canvas.addEventListener("click", hit);
+window.addEventListener("keydown", e => {
+    if (e.code === "Space") hit();
 });
 
-function loop(){
-  if(!alive)return;
-  player.style.left=px+"px";
-  player.style.top=py+"px";
-
-  enemies.forEach(e=>{
-    let dx=px-e.x, dy=py-e.y;
-    let d=Math.hypot(dx,dy);
-    e.x+=dx/d*1.5;
-    e.y+=dy/d*1.5;
-    e.style.left=e.x+"px";
-    e.style.top=e.y+"px";
-    if(d<10) gameover();
-  });
-
-  let t=((performance.now()-start)/1000);
-  document.getElementById("time").innerText=t.toFixed(1)+"s";
-  if(t>=60) gameover(true);
-
-  requestAnimationFrame(loop);
-}
 loop();
-
-function gameover(win=false){
-  alive=false;
-  let t=((performance.now()-start)/1000).toFixed(2);
-  localStorage.best=Math.max(localStorage.best||0,t);
-  document.getElementById("result").innerText=
-    win ? "🏆 You beat the challenge!" :
-    "You survived "+t+"s\nBest: "+localStorage.best+"s";
-  document.getElementById("overlay").style.display="flex";
-}
-
-function restart(){ location.reload(); }
-
-function unlock(){
-  window.open("https://afdian.com/a/bigbangmars","_blank");
-}
 </script>
 
 </body>
 </html>
-
