@@ -2,175 +2,123 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Time Stopper</title>
+<title>1 Minute Challenge</title>
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: #0e0e11;
-    color: #fff;
-    font-family: monospace;
-    overflow: hidden;
-  }
-
-  #ui {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    z-index: 10;
-    font-size: 14px;
-    opacity: 0.9;
-  }
-
-  #game {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-  }
-
-  .player {
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    background: #00ffcc;
-    box-shadow: 0 0 12px #00ffcc;
-  }
-
-  .enemy {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background: #ff3355;
-    box-shadow: 0 0 10px #ff3355;
-  }
-
-  #gameover {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    font-size: 20px;
-  }
-
-  button {
-    margin-top: 20px;
-    padding: 10px 20px;
-    font-family: monospace;
-    background: #00ffcc;
-    border: none;
-    cursor: pointer;
-  }
+body {
+  margin:0;
+  background:#0b0b10;
+  color:#fff;
+  font-family:monospace;
+  overflow:hidden;
+}
+#ui {
+  position:fixed;
+  top:10px; left:10px;
+}
+.player {
+  position:absolute;
+  width:12px; height:12px;
+  background:#00ffd5;
+  box-shadow:0 0 12px #00ffd5;
+}
+.enemy {
+  position:absolute;
+  width:10px; height:10px;
+  background:#ff3355;
+}
+#overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.85);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+}
+button {
+  padding:10px 20px;
+  margin-top:12px;
+  font-family:monospace;
+  cursor:pointer;
+}
 </style>
 </head>
 <body>
 
 <div id="ui">
-  <div>⏸ Hold SPACE to stop time</div>
-  <div>🎮 Move: WASD / Arrows</div>
-  <div id="score">Time survived: 0.0s</div>
+  <div>⏱ Survive 60 seconds</div>
+  <div id="time">0.0s</div>
 </div>
 
-<div id="game"></div>
-
-<div id="gameover">
-  <div id="finalScore"></div>
-  <button onclick="location.reload()">Restart</button>
+<div id="overlay">
+  <div id="result"></div>
+  <button onclick="restart()">Retry</button>
+  <button onclick="unlock()">🌍 Unlock Global Ranking (¥9.9)</button>
 </div>
 
 <script>
-const game = document.getElementById("game");
-const scoreEl = document.getElementById("score");
-const gameoverEl = document.getElementById("gameover");
-const finalScoreEl = document.getElementById("finalScore");
+const body = document.body;
+let px = innerWidth/2, py = innerHeight/2;
+let player = document.createElement("div");
+player.className="player";
+body.appendChild(player);
 
-const player = document.createElement("div");
-player.className = "player";
-game.appendChild(player);
+let enemies=[];
+let start=performance.now();
+let alive=true;
 
-let px = window.innerWidth / 2;
-let py = window.innerHeight / 2;
-let speed = 3;
-let keys = {};
-let enemies = [];
-let timeStopped = false;
-let startTime = performance.now();
-let alive = true;
-
-player.style.left = px + "px";
-player.style.top = py + "px";
-
-document.addEventListener("keydown", e => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.code === "Space") timeStopped = true;
-});
-
-document.addEventListener("keyup", e => {
-  keys[e.key.toLowerCase()] = false;
-  if (e.code === "Space") timeStopped = false;
-});
-
-function spawnEnemy() {
-  const e = document.createElement("div");
-  e.className = "enemy";
-  let x, y;
-  if (Math.random() < 0.5) {
-    x = Math.random() * window.innerWidth;
-    y = Math.random() < 0.5 ? -20 : window.innerHeight + 20;
-  } else {
-    y = Math.random() * window.innerHeight;
-    x = Math.random() < 0.5 ? -20 : window.innerWidth + 20;
-  }
-  e.x = x;
-  e.y = y;
-  e.speed = 0.6 + Math.random() * 0.6;
-  game.appendChild(e);
+function spawn(){
+  let e=document.createElement("div");
+  e.className="enemy";
+  e.x=Math.random()*innerWidth;
+  e.y=Math.random()*innerHeight;
+  body.appendChild(e);
   enemies.push(e);
 }
+setInterval(spawn,500);
 
-setInterval(spawnEnemy, 600);
+document.addEventListener("mousemove",e=>{
+  px=e.clientX; py=e.clientY;
+});
 
-function loop() {
-  if (!alive) return;
+function loop(){
+  if(!alive)return;
+  player.style.left=px+"px";
+  player.style.top=py+"px";
 
-  if (timeStopped) {
-    if (keys["w"] || keys["arrowup"]) py -= speed;
-    if (keys["s"] || keys["arrowdown"]) py += speed;
-    if (keys["a"] || keys["arrowleft"]) px -= speed;
-    if (keys["d"] || keys["arrowright"]) px += speed;
-  }
-
-  player.style.left = px + "px";
-  player.style.top = py + "px";
-
-  enemies.forEach(e => {
-    if (!timeStopped) {
-      const dx = px - e.x;
-      const dy = py - e.y;
-      const dist = Math.hypot(dx, dy);
-      e.x += (dx / dist) * e.speed * 6;
-      e.y += (dy / dist) * e.speed * 6;
-    }
-    e.style.left = e.x + "px";
-    e.style.top = e.y + "px";
-
-    if (Math.abs(e.x - px) < 10 && Math.abs(e.y - py) < 10) {
-      alive = false;
-      const t = ((performance.now() - startTime) / 1000).toFixed(2);
-      finalScoreEl.textContent = `You survived ${t}s`;
-      gameoverEl.style.display = "flex";
-    }
+  enemies.forEach(e=>{
+    let dx=px-e.x, dy=py-e.y;
+    let d=Math.hypot(dx,dy);
+    e.x+=dx/d*1.5;
+    e.y+=dy/d*1.5;
+    e.style.left=e.x+"px";
+    e.style.top=e.y+"px";
+    if(d<10) gameover();
   });
 
-  const t = ((performance.now() - startTime) / 1000).toFixed(1);
-  scoreEl.textContent = `Time survived: ${t}s`;
+  let t=((performance.now()-start)/1000);
+  document.getElementById("time").innerText=t.toFixed(1)+"s";
+  if(t>=60) gameover(true);
 
   requestAnimationFrame(loop);
 }
-
 loop();
+
+function gameover(win=false){
+  alive=false;
+  let t=((performance.now()-start)/1000).toFixed(2);
+  localStorage.best=Math.max(localStorage.best||0,t);
+  document.getElementById("result").innerText=
+    win ? "🏆 You beat the challenge!" :
+    "You survived "+t+"s\nBest: "+localStorage.best+"s";
+  document.getElementById("overlay").style.display="flex";
+}
+
+function restart(){ location.reload(); }
+
+function unlock(){
+  window.open("https://afdian.com/a/aitoolbox","_blank");
+}
 </script>
 
 </body>
