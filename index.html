@@ -1,153 +1,177 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 全网最优比价系统 - 极速版</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .ai-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
-    </style>
+<meta charset="UTF-8">
+<title>Time Stopper</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0e0e11;
+    color: #fff;
+    font-family: monospace;
+    overflow: hidden;
+  }
+
+  #ui {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    font-size: 14px;
+    opacity: 0.9;
+  }
+
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .player {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #00ffcc;
+    box-shadow: 0 0 12px #00ffcc;
+  }
+
+  .enemy {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #ff3355;
+    box-shadow: 0 0 10px #ff3355;
+  }
+
+  #gameover {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    font-size: 20px;
+  }
+
+  button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-family: monospace;
+    background: #00ffcc;
+    border: none;
+    cursor: pointer;
+  }
+</style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans">
+<body>
 
-    <!-- 顶部导航 -->
-    <nav class="glass sticky top-0 z-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold italic">AI</div>
-            <span class="text-xl font-black text-slate-800 tracking-tight">MVC-比价代理</span>
-        </div>
-        <div class="text-xs text-slate-500 font-medium">当前节点：2026-云端加速</div>
-    </nav>
+<div id="ui">
+  <div>⏸ Hold SPACE to stop time</div>
+  <div>🎮 Move: WASD / Arrows</div>
+  <div id="score">Time survived: 0.0s</div>
+</div>
 
-    <main class="max-w-3xl mx-auto mt-12 px-4 pb-20">
-        <!-- 核心输入区 -->
-        <div class="text-center mb-10">
-            <h2 class="text-4xl font-extrabold text-slate-900 mb-4">输入商品，AI 全网找最优解</h2>
-            <p class="text-slate-500">自动穿透京东、淘宝、拼多多实时底价，跳过广告，直达真相。</p>
-        </div>
+<div id="game"></div>
 
-        <div class="relative group">
-            <input id="productInput" type="text" placeholder="输入你想找的东西，如：iPhone 17 Pro 256G..." 
-                class="w-full h-16 pl-6 pr-32 rounded-2xl border-2 border-slate-200 focus:border-blue-500 outline-none text-lg shadow-sm transition-all">
-            <button onclick="runAIAgent()" class="absolute right-2 top-2 bottom-2 bg-blue-600 text-white px-6 rounded-xl font-bold hover:bg-blue-700 transition active:scale-95 shadow-lg">
-                开始搜索
-            </button>
-        </div>
+<div id="gameover">
+  <div id="finalScore"></div>
+  <button onclick="location.reload()">Restart</button>
+</div>
 
-        <!-- AI 思考状态 -->
-        <div id="aiThinking" class="hidden mt-8 space-y-4">
-            <div class="flex items-center gap-3 text-blue-600 font-semibold italic ai-pulse">
-                <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                AI Agent 正在多维搜索中...
-            </div>
-            <div id="logs" class="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-xs overflow-hidden leading-relaxed shadow-inner">
-                <!-- 动态日志 -->
-            </div>
-        </div>
+<script>
+const game = document.getElementById("game");
+const scoreEl = document.getElementById("score");
+const gameoverEl = document.getElementById("gameover");
+const finalScoreEl = document.getElementById("finalScore");
 
-        <!-- 结果展示区 -->
-        <div id="results" class="hidden mt-8 space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 class="font-bold text-slate-800 mb-4 border-b pb-2">📊 全网实时报价单</h3>
-                <div id="priceTable" class="space-y-3">
-                    <!-- 价格行 -->
-                </div>
-            </div>
+const player = document.createElement("div");
+player.className = "player";
+game.appendChild(player);
 
-            <div id="finalVerdict" class="bg-blue-600 text-white p-6 rounded-2xl shadow-xl transform rotate-1">
-                <h4 class="font-black text-xl mb-2 flex items-center gap-2">
-                    🏆 AI 最终购买方案
-                </h4>
-                <p id="bestChoice" class="opacity-90 text-sm leading-relaxed"></p>
-                <button class="mt-4 w-full bg-white text-blue-600 py-3 rounded-xl font-black hover:bg-blue-50 transition shadow-md">
-                    一键领券购买 (返利链接)
-                </button>
-            </div>
-        </div>
-    </main>
+let px = window.innerWidth / 2;
+let py = window.innerHeight / 2;
+let speed = 3;
+let keys = {};
+let enemies = [];
+let timeStopped = false;
+let startTime = performance.now();
+let alive = true;
 
-    <script>
-        // 注意：这个公共代理服务和API都是示例性的，随时可能失效。
-        // 真实商用需要稳定的后端服务和API Key。
-        const API_PROXY = 'corsproxy.io?'; 
+player.style.left = px + "px";
+player.style.top = py + "px";
 
-        function appendLog(msg) {
-            const logs = document.getElementById('logs');
-            const p = document.createElement('p');
-            p.innerText = `> ${msg}`;
-            logs.appendChild(p);
-            logs.scrollTop = logs.scrollHeight; // 滚动到底部
-        }
+document.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.code === "Space") timeStopped = true;
+});
 
-        async function runAIAgent() {
-            const input = document.getElementById('productInput').value;
-            if(!input) return alert('请输入商品！');
+document.addEventListener("keyup", e => {
+  keys[e.key.toLowerCase()] = false;
+  if (e.code === "Space") timeStopped = false;
+});
 
-            // 重置界面
-            document.getElementById('aiThinking').classList.remove('hidden');
-            document.getElementById('results').classList.add('hidden');
-            document.getElementById('logs').innerHTML = '';
-            appendLog('初始化搜索协议 (Search v2.6)...');
+function spawnEnemy() {
+  const e = document.createElement("div");
+  e.className = "enemy";
+  let x, y;
+  if (Math.random() < 0.5) {
+    x = Math.random() * window.innerWidth;
+    y = Math.random() < 0.5 ? -20 : window.innerHeight + 20;
+  } else {
+    y = Math.random() * window.innerHeight;
+    x = Math.random() < 0.5 ? -20 : window.innerWidth + 20;
+  }
+  e.x = x;
+  e.y = y;
+  e.speed = 0.6 + Math.random() * 0.6;
+  game.appendChild(e);
+  enemies.push(e);
+}
 
-            // 核心步骤：调用真实搜索引擎 API 获取数据 (这里使用了示例 API)
-            const searchQuery = encodeURIComponent(`"${input}" 京东 拼多多 天猫 价格对比 2026`);
-            // 此处的 URL 仅为示例，您需要替换为真实可用的搜索API endpoint
-            const searchUrl = `${API_PROXY}api.search.brave4j.com{searchQuery}&count=5`;
-            
-            appendLog('正在向互联网发送真实搜索请求...');
+setInterval(spawnEnemy, 600);
 
-            try {
-                // 真实开发中，您需要在 headers 中添加您的 API Key
-                // const response = await fetch(searchUrl, { headers: { 'X-API-Key': 'YOUR_API_KEY' } });
-                
-                // 为了演示，我们继续使用模拟响应格式
-                // if (!response.ok) throw new Error('API 请求失败，请检查 API 状态或 Key。');
-                
-                const realResults = {
-                    web: {
-                        results: [
-                            { title: "京东自营 Apple iPhone 17 Pro 价格¥7999", description: "京东官方旗舰店，次日达，三年保修，售价7999元，满减200元。", url: "#"},
-                            { title: "拼多多百亿补贴 iPhone 17 Pro 仅售¥7199", description: "拼多多官方补贴活动，价格低至7199元，发货较慢，但价格最具优势。", url: "#"},
-                            { title: "天猫旗舰店 iPhone 17 Pro 实时价 ¥7850", description: "天猫 Apple Store，价格7850元，有150元优惠券，顺丰包邮。", url: "#"}
-                        ]
-                    }
-                };
+function loop() {
+  if (!alive) return;
 
-                appendLog('成功获取真实搜索结果并进行解析...');
-                showFinalResults(input, realResults);
+  if (timeStopped) {
+    if (keys["w"] || keys["arrowup"]) py -= speed;
+    if (keys["s"] || keys["arrowdown"]) py += speed;
+    if (keys["a"] || keys["arrowleft"]) px -= speed;
+    if (keys["d"] || keys["arrowright"]) px += speed;
+  }
 
-            } catch (error) {
-                appendLog(`请求失败: ${error.message}.`);
-                alert('真实数据获取失败。请检查网络或使用一个真实的、稳定的后端服务。');
-                document.getElementById('aiThinking').classList.add('hidden');
-            }
-        }
+  player.style.left = px + "px";
+  player.style.top = py + "px";
 
-        function showFinalResults(name, results) {
-            document.getElementById('aiThinking').classList.add('hidden');
-            document.getElementById('results').classList.remove('hidden');
+  enemies.forEach(e => {
+    if (!timeStopped) {
+      const dx = px - e.x;
+      const dy = py - e.y;
+      const dist = Math.hypot(dx, dy);
+      e.x += (dx / dist) * e.speed * 6;
+      e.y += (dy / dist) * e.speed * 6;
+    }
+    e.style.left = e.x + "px";
+    e.style.top = e.y + "px";
 
-            // 解析真实搜索结果来填充界面 (这里需要复杂的AI逻辑来提取数据)
-            // 我们假设 AI 已经解析出以下结构：
-            const platforms =;
+    if (Math.abs(e.x - px) < 10 && Math.abs(e.y - py) < 10) {
+      alive = false;
+      const t = ((performance.now() - startTime) / 1000).toFixed(2);
+      finalScoreEl.textContent = `You survived ${t}s`;
+      gameoverEl.style.display = "flex";
+    }
+  });
 
-            const priceTable = document.getElementById('priceTable');
-            priceTable.innerHTML = platforms.map(item => `
-                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                    <span class="font-bold text-slate-700">${item.p}</span>
-                    <div class="flex items-center gap-4">
-                        <span class="text-xs font-medium text-slate-400">${item.tag}</span>
-                        <span class="text-xl font-black ${item.color}">¥${item.price}</span>
-                    </div>
-                </div>
-            `).join('');
+  const t = ((performance.now() - startTime) / 1000).toFixed(1);
+  scoreEl.textContent = `Time survived: ${t}s`;
 
-            // 根据真实数据生成建议
-            document.getElementById('bestChoice').innerText = `经 AI 深度分析真实搜索结果，${name} 在拼多多目前处于价格洼地（¥7199）。虽然京东物流更快，但价格差距较大。建议追求性价比优先考虑拼多多。`;
-        }
-    </script>
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
 </body>
 </html>
